@@ -5,8 +5,7 @@
 /// Tests for `#[derive(is_enum_variant)]`.
 
 #[macro_use]
-extern crate derive_is_enum_variant;
-extern crate diff;
+extern crate derive_enum_methods;
 
 use std::env;
 use std::fs::File;
@@ -15,6 +14,27 @@ use std::process::Command;
 
 #[test]
 fn cargo_readme_up_to_date() {
+    /// A wrapper that exposes the given object's [`Display`] impl as [`Debug`].
+    #[derive(Clone, PartialEq)]
+    pub struct DisplayAsDebugWrapper<T>(T);
+
+    impl<T> std::fmt::Debug for DisplayAsDebugWrapper<T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl<T> std::ops::Deref for DisplayAsDebugWrapper<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
     if env::var("CI").is_ok() {
         return;
     }
@@ -40,14 +60,11 @@ fn cargo_readme_up_to_date() {
         println!();
         println!("+++ expected README.md");
         println!("--- actual README.md");
-        for d in diff::lines(&expected, &actual) {
-            match d {
-                diff::Result::Left(l) => println!("+{}", l),
-                diff::Result::Right(r) => println!("-{}", r),
-                diff::Result::Both(b, _) => println!(" {}", b),
-            }
-        }
-        panic!("Run `cargo readme > README.md` to update README.md")
+        pretty_assertions::assert_eq!(
+            DisplayAsDebugWrapper(&*expected),
+            DisplayAsDebugWrapper(&*actual),
+            "Run `cargo readme > README.md` to update README.md"
+        );
     }
 }
 
@@ -81,8 +98,9 @@ fn basic_enum_predicates() {
 }
 
 /// Different kinds of enum variants.
-#[derive(is_enum_variant)]
+#[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked)]
 pub enum VariantKinds {
+    Single(i32),
     Struct { x: usize, y: usize },
     Tuple(usize, usize),
     Unit,
@@ -90,14 +108,39 @@ pub enum VariantKinds {
 
 #[test]
 fn variant_kinds() {
+    assert!(VariantKinds::Single(5).is_single());
     assert!(VariantKinds::Struct { x: 1, y: 2 }.is_struct());
     assert!(VariantKinds::Tuple(1, 2).is_tuple());
     assert!(VariantKinds::Unit.is_unit());
+
+    assert_eq!(
+        VariantKinds::Struct { x: 1, y: 2 }.as_struct(),
+        Some((&1, &2))
+    );
+    assert_eq!(VariantKinds::Tuple(1, 2).as_tuple(), Some((&1, &2)));
+    assert_eq!(VariantKinds::Single(2).as_single(), Some(&2i32));
+
+    unsafe {
+        assert_eq!(
+            VariantKinds::Struct { x: 1, y: 2 }.as_struct_unchecked(),
+            (&1, &2)
+        );
+        assert_eq!(VariantKinds::Tuple(1, 2).as_tuple_unchecked(), (&1, &2));
+        assert_eq!(VariantKinds::Single(2).as_single_unchecked(), &2i32);
+    }
+}
+
+#[should_panic]
+#[test]
+fn panics_on_invalid_kind() {
+    unsafe {
+        VariantKinds::Unit.as_struct_unchecked();
+    }
 }
 
 /// Various funky case names.
 #[allow(non_camel_case_types)]
-#[derive(is_enum_variant)]
+#[derive(is_enum_variant, as_enum_variant)]
 pub enum Funky {
     /// doc
     CAPS,
@@ -121,23 +164,32 @@ fn funky_variant_names() {
 }
 
 /// Test providing custom predicate names.
-#[derive(is_enum_variant)]
+#[derive(is_enum_variant, as_enum_variant)]
 pub enum CustomNames {
-    #[is_enum_variant(name = "i_dont_know_why_you_say")] Goodbye,
-    #[is_enum_variant(name = "i_say")] Hello,
+    #[is_enum_variant(name = "i_dont_know_why_you_say")]
+    #[as_enum_variant(name = "i_dont_know_why_you_say_val")]
+    Goodbye(()),
+    #[is_enum_variant(name = "i_say")]
+    #[as_enum_variant(name = "i_say_val")]
+    Hello(()),
 }
 
 #[test]
 fn custom_predicate_names() {
-    assert!(CustomNames::Goodbye.i_dont_know_why_you_say());
-    assert!(CustomNames::Hello.i_say());
+    assert!(CustomNames::Goodbye(()).i_dont_know_why_you_say());
+    assert!(CustomNames::Hello(()).i_say());
+    assert_eq!(
+        CustomNames::Goodbye(()).i_dont_know_why_you_say_val(),
+        Some(&())
+    );
+    assert_eq!(CustomNames::Hello(()).i_say_val(), Some(&()));
 }
-
 
 /// This doesn't get a predicate for every variant
 #[derive(is_enum_variant)]
 pub enum Skip {
-    #[is_enum_variant(skip)] NoPredicate,
+    #[is_enum_variant(skip)]
+    NoPredicate,
     YesPredicate,
 }
 

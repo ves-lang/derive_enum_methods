@@ -1,17 +1,13 @@
 # Contributing to `derive_is_enum_variant`
 
 Hi! We'd love to have your contributions! If you want help or mentorship, reach
-out to us in a GitHub issue, or ping `fitzgen` in
-[`#rust` on irc.mozilla.org](irc://irc.mozilla.org#rust) and introduce yourself.
+out to us in a GitHub issue.
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-
-
-- [Code of Conduct](#code-of-conduct)
-- [Building](#building)
-- [Testing](#testing)
-- [Automatic code formatting](#automatic-code-formatting)
+- [Contributing to `derive_is_enum_variant`](#contributing-to-derive_is_enum_variant)
+  - [Code of Conduct](#code-of-conduct)
+  - [Building](#building)
+  - [Testing](#testing)
+  - [Automatic code formatting](#automatic-code-formatting)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
