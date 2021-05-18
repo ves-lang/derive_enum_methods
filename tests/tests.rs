@@ -128,6 +128,28 @@ fn variant_kinds() {
         assert_eq!(VariantKinds::Tuple(1, 2).as_tuple_unchecked(), (&1, &2));
         assert_eq!(VariantKinds::Single(2).as_single_unchecked(), &2i32);
     }
+
+    assert_eq!(
+        VariantKinds::Struct { x: 1, y: 2 }.as_struct_mut(),
+        Some((&mut 1, &mut 2))
+    );
+    assert_eq!(
+        VariantKinds::Tuple(1, 2).as_tuple_mut(),
+        Some((&mut 1, &mut 2))
+    );
+    assert_eq!(VariantKinds::Single(2).as_single_mut(), Some(&mut 2i32));
+
+    unsafe {
+        assert_eq!(
+            VariantKinds::Struct { x: 1, y: 2 }.as_struct_unchecked_mut(),
+            (&mut 1, &mut 2)
+        );
+        assert_eq!(
+            VariantKinds::Tuple(1, 2).as_tuple_unchecked_mut(),
+            (&mut 1usize, &mut 2usize)
+        );
+        assert_eq!(VariantKinds::Single(2).as_single_unchecked_mut(), &mut 2i32);
+    }
 }
 
 #[should_panic]

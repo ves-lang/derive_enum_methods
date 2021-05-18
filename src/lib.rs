@@ -23,7 +23,7 @@
 //! struct Kitten;
 //!
 //! // This derive ...
-//! #[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked)]
+//! #[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked(mut))]
 //! pub enum Pet {
 //!     Doggo(Doggo),
 //!     Kitten(Kitten),
@@ -46,7 +46,21 @@
 //!             None
 //!         }
 //!     }
+//!     fn as_doggo_mut(&mut self) -> Option<&mut Doggo> {
+//!         if Self::Doggo(__self_0) = self {
+//!             Some(__self_0)
+//!         } else {
+//!             None
+//!         }
+//!     }
 //!     fn as_kitten(&self) -> Option<&Kitten> {
+//!         if Self::Kitten(__self_0) = self {
+//!             Some(__self_0)
+//!         } else {
+//!             None
+//!         }
+//!     }
+//!     fn as_kitten_mut(&mut self) -> Option<&mut Kitten> {
 //!         if Self::Kitten(__self_0) = self {
 //!             Some(__self_0)
 //!         } else {
@@ -67,7 +81,31 @@
 //!             }
 //!         }
 //!     }
+//!     unsafe fn as_doggo_unchecked_mut(&mut self) -> &mut Doggo {
+//!         match self {
+//!             Self::Doggo(__self_0) => __self_0,
+//!             _ => {
+//!                 if cfg!(debug_assertions) {
+//!                     unreachable!()
+//!                 } else {
+//!                     core::hint::unreachable_unchecked()
+//!                 }
+//!             }
+//!         }
+//!     }
 //!     unsafe fn as_kitten_unchecked(&self) -> &Kitten {
+//!         match self {
+//!             Self::Kitten(__self_0) => __self_0,
+//!             _ => {
+//!                 if cfg!(debug_assertions) {
+//!                     unreachable!()
+//!                 } else {
+//!                     core::hint::unreachable_unchecked()
+//!                 }
+//!             }
+//!         }
+//!     }
+//!     unsafe fn as_kitten_unchecked(&mut self) -> &mut Kitten {
 //!         match self {
 //!             Self::Kitten(__self_0) => __self_0,
 //!             _ => {
@@ -165,7 +203,7 @@ macro_rules! syn_try {
     };
 }
 
-#[proc_macro_derive(is_enum_variant, attributes(is_enum_variant))]
+#[proc_macro_derive(is_enum_variant, attributes(is_enum_variant, is_enum_variant_mut))]
 pub fn derive_is_enum_variant(tokens: TokenStream) -> TokenStream {
     let ast = syn_try!(syn::parse::<syn::DeriveInput>(tokens));
     expand_derive_impl(&ast, EnumDeriveKind::Is)
@@ -306,10 +344,7 @@ impl EnumDeriveKind {
                 format!("Returns `true` if the value is [`{}`].", variant_name)
             }
             EnumDeriveKind::As => {
-                format!(
-                    "Returns `Some(&data)` if the value is [`{}`].",
-                    variant_name
-                )
+                format!("Returns `Some(value)` the value is [`{}`].", variant_name)
             }
             EnumDeriveKind::Unchecked => {
                 format!("Returns the payload of the [`{}`] variant without checking whether this is correct in release builds. \
@@ -352,9 +387,10 @@ fn expand_derive_impl(ast: &syn::DeriveInput, kind: EnumDeriveKind) -> TokenStre
         } else {
             kind.name_for(variant_name.to_snake_case())
         };
+        let predicate_name_mut = syn::Ident::new(&format!("{}_mut", predicate_name), ident.span());
         let predicate_name = syn::Ident::new(&predicate_name, ident.span());
 
-        let (field_bindings, return_type) = if matches!(kind, EnumDeriveKind::Is) {
+        let (field_bindings, return_type, return_type_mut) = if matches!(kind, EnumDeriveKind::Is) {
             (
                 vec![match fields {
                     syn::Fields::Named(..) => quote! { { .. } },
@@ -362,19 +398,24 @@ fn expand_derive_impl(ast: &syn::DeriveInput, kind: EnumDeriveKind) -> TokenStre
                     syn::Fields::Unit => quote! {},
                 }],
                 quote! {},
+                quote! {},
             )
         } else {
             let field_types = fields.iter().map(|f| &f.ty).collect::<Vec<_>>();
             if field_types.is_empty() {
                 // This is a no-payload enum, so we can't generate a getter
-                (Vec::new(), quote! {()})
+                (Vec::new(), quote! {()}, quote! {()})
             } else if field_types.len() == 1 {
                 let bindings = generate_bindings(fields);
                 let ty = field_types.first().unwrap();
-                (bindings, quote! { &#ty })
+                (bindings, quote! { &#ty }, quote! { &mut #ty })
             } else {
                 let bindings = generate_bindings(fields);
-                (bindings, quote! { ( #( &#field_types ),* )})
+                (
+                    bindings,
+                    quote! { ( #( &#field_types ),* )},
+                    quote! { ( #( &mut #field_types ),* )},
+                )
             }
         };
 
@@ -382,18 +423,26 @@ fn expand_derive_impl(ast: &syn::DeriveInput, kind: EnumDeriveKind) -> TokenStre
             continue;
         }
 
-        let mut field_names = field_bindings
+        let field_names = field_bindings
             .iter()
             .enumerate()
             .map(|(i, s)| syn::Ident::new(&format!("__self_{}", i), s.span()))
             .collect::<Vec<_>>();
 
         let field_list = if field_names.len() == 1 {
-            let field = field_names.pop().unwrap();
+            let field = field_names.first().unwrap();
             quote! { &#field }
         } else {
             quote! {
                ( #( &#field_names ),* )
+            }
+        };
+        let field_list_mut = if field_names.len() == 1 {
+            let field = field_names.first().unwrap();
+            quote! { &mut *#field }
+        } else {
+            quote! {
+               ( #( &mut *#field_names ),* )
             }
         };
 
@@ -422,6 +471,18 @@ fn expand_derive_impl(ast: &syn::DeriveInput, kind: EnumDeriveKind) -> TokenStre
                             None
                         }
                     }
+
+                    #[doc = #doc]
+                    #[inline]
+                    #[allow(unreachable_patterns)]
+                    #[allow(dead_code)]
+                    pub fn #predicate_name_mut(&mut self) -> Option<#return_type_mut> {
+                        if let Self :: #ident { #( #field_bindings ),* } = self {
+                            Some( #field_list_mut )
+                        } else {
+                            None
+                        }
+                    }
                 }
             }
             EnumDeriveKind::Unchecked => {
@@ -434,6 +495,25 @@ fn expand_derive_impl(ast: &syn::DeriveInput, kind: EnumDeriveKind) -> TokenStre
                         match self {
                             Self :: #ident { #( #field_bindings ),* } => {
                                 #field_list
+                            }
+                            _ => {
+                                if cfg!(debug_assertions) {
+                                    unreachable!()
+                                } else {
+                                    ::std::hint::unreachable_unchecked()
+                                }
+                            }
+                        }
+                    }
+
+                    #[doc = #doc]
+                    #[inline]
+                    #[allow(unreachable_patterns)]
+                    #[allow(dead_code)]
+                    pub unsafe fn #predicate_name_mut(&mut self) -> #return_type_mut {
+                        match self {
+                            Self :: #ident { #( #field_bindings ),* } => {
+                                #field_list_mut
                             }
                             _ => {
                                 if cfg!(debug_assertions) {
@@ -477,6 +557,6 @@ fn generate_bindings(fields: &syn::Fields) -> Vec<quote::__private::TokenStream>
                 }
             })
             .collect(),
-        syn::Fields::Unit => dbg!(Vec::new()),
+        syn::Fields::Unit => Vec::new(),
     }
 }

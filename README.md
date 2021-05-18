@@ -25,7 +25,7 @@ struct Doggo;
 struct Kitten;
 
 // This derive ...
-#[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked)]
+#[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked(mut))]
 pub enum Pet {
     Doggo(Doggo),
     Kitten(Kitten),
@@ -48,7 +48,21 @@ impl Pet {
             None
         }
     }
+    fn as_doggo_mut(&mut self) -> Option<&mut Doggo> {
+        if Self::Doggo(__self_0) = self {
+            Some(__self_0)
+        } else {
+            None
+        }
+    }
     fn as_kitten(&self) -> Option<&Kitten> {
+        if Self::Kitten(__self_0) = self {
+            Some(__self_0)
+        } else {
+            None
+        }
+    }
+    fn as_kitten_mut(&mut self) -> Option<&mut Kitten> {
         if Self::Kitten(__self_0) = self {
             Some(__self_0)
         } else {
@@ -69,7 +83,31 @@ impl Pet {
             }
         }
     }
+    unsafe fn as_doggo_unchecked_mut(&mut self) -> &mut Doggo {
+        match self {
+            Self::Doggo(__self_0) => __self_0,
+            _ => {
+                if cfg!(debug_assertions) {
+                    unreachable!()
+                } else {
+                    core::hint::unreachable_unchecked()
+                }
+            }
+        }
+    }
     unsafe fn as_kitten_unchecked(&self) -> &Kitten {
+        match self {
+            Self::Kitten(__self_0) => __self_0,
+            _ => {
+                if cfg!(debug_assertions) {
+                    unreachable!()
+                } else {
+                    core::hint::unreachable_unchecked()
+                }
+            }
+        }
+    }
+    unsafe fn as_kitten_unchecked(&mut self) -> &mut Kitten {
         match self {
             Self::Kitten(__self_0) => __self_0,
             _ => {
