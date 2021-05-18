@@ -13,7 +13,7 @@
 //! derive_enum_methods = { git = "https://github.com/ves-lang/derive_enum_methods" }
 //! ```
 //!
-//! And then add `#[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked)]` to your `enum` definitions:
+//! And then add `#[derive(is_enum_variant, as_enum_variant, unchecked_enum_variant)]` to your `enum` definitions:
 //!
 //! ```rust,ignore
 //! #[macro_use]
@@ -23,7 +23,7 @@
 //! struct Kitten;
 //!
 //! // This derive ...
-//! #[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked(mut))]
+//! #[derive(is_enum_variant, as_enum_variant, unchecked_enum_variant(mut))]
 //! pub enum Pet {
 //!     Doggo(Doggo),
 //!     Kitten(Kitten),
@@ -215,8 +215,8 @@ pub fn derive_as_enum_variant(tokens: TokenStream) -> TokenStream {
     expand_derive_impl(&ast, EnumDeriveKind::As)
 }
 
-#[proc_macro_derive(enum_variant_unchecked, attributes(enum_variant_unchecked))]
-pub fn derive_enum_variant_unchecked(tokens: TokenStream) -> TokenStream {
+#[proc_macro_derive(unchecked_enum_variant, attributes(unchecked_enum_variant))]
+pub fn derive_unchecked_enum_variant(tokens: TokenStream) -> TokenStream {
     let ast = syn_try!(syn::parse::<syn::DeriveInput>(tokens));
     expand_derive_impl(&ast, EnumDeriveKind::Unchecked)
 }

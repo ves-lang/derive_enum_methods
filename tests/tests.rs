@@ -98,7 +98,7 @@ fn basic_enum_predicates() {
 }
 
 /// Different kinds of enum variants.
-#[derive(is_enum_variant, as_enum_variant, enum_variant_unchecked)]
+#[derive(is_enum_variant, as_enum_variant, unchecked_enum_variant)]
 pub enum VariantKinds {
     Single(i32),
     Struct { x: usize, y: usize },
